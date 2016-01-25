@@ -1,0 +1,73 @@
+* {
+  box-sizing: border-box;
+}
+
+@import url(https://fonts.googleapis.com/css?family=Roboto);
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+/* Utilities */
+.u-layout-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.u-layout-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.u-cross-center {
+  align-items: center;
+}
+
+.u-main-center {
+  justify-content: center;
+}
+
+.u-stretch {
+  flex-grow: 1;
+}
+
+.ActivityChart {
+  margin: 10px;
+  padding: 0px;
+  width: 600px;
+  height: 300px;
+}
+
+.ActivityChart--zoomed {
+  width: 90%;
+  height: 90%;
+}
+
+.ActivityChart__content {
+  margin: 10px;
+}
+
+.Header {
+  background-color: #eee;
+  border-bottom: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.Header__repo {
+  font-weight: bold;
+}
+
+.DevToolsHint {
+  padding: 10px;
+}
+
+.GitLink {
+  padding: 10px;
+}
+
+.GitLink > a {
+  color: #444;
+  font-weight: bold;
+  text-decoration: none;
+}

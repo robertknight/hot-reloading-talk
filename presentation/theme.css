@@ -1,0 +1,102 @@
+@import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+@import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+@import url(https://fonts.googleapis.com/css?family=Source+Sans+Pro);
+
+/* ## Base ## */
+
+body {
+  font-family: 'Source Sans Pro';
+}
+
+h1, h2, h3 {
+  font-family: 'Arial';
+  font-weight: normal;
+}
+
+
+/* ## Slide Content ## */
+
+.remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+
+.remark-slide-content {
+  background-color: #333;
+  color: #eee;
+}
+
+.remark-slide-content h1 {
+  font-variant: small-caps;
+}
+
+.remark-slide-content p {
+  font-size: 25px;
+}
+
+.remark-slide-content a {
+  color: #eee;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.remark-slide-content ul,
+.remark-slide-content ol,
+.remark-slide-content li > p {
+  font-size: 35px;
+}
+
+.remark-slide-content .remark-code {
+  border-radius: 2px;
+  box-shadow: 2px 2px 5px 0px rgba(46,46,46,1);
+}
+
+.remark-code-line-highlighted {
+  background-color: #555;
+}
+
+/* Slide-in-from-right transition */
+.remark-slide-container {
+  transition: transform .8s cubic-bezier(0.215, 0.61, 0.355, 1);
+  opacity: 0;
+  display: block;
+  transform: translateX(-100%);
+}
+
+.remark-visible ~ .remark-slide-container {
+  transform: translateX(100%);
+}
+
+.remark-visible {
+  opacity: 1;
+  transform: translateX(0%);
+}
+
+.remark-fading {
+  opacity: 1;
+}
+
+/* ## Custom Content Styles ## */
+
+.hint {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+  opacity: .6;
+}
+
+.center-block {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.large-code {
+  font-size: 48px;
+  font-family: 'Ubuntu Mono';
+}
+
+.full-slide-img > img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}

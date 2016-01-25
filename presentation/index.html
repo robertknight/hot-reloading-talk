@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Hot Reloading with React and Redux</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" href="theme.css">
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# Hot Reloading with React and Redux
+
+.hint[Press 'P' for slide notes]
+
+???
+- This talk was originally called "Fast iteration on complex applications with Redux".
+- That's not very snappy. I'm going to try again - this is "Hot Reloading with React and Redux".
+
+---
+
+class: middle
+
+## Rob Knight
+
+@robknight_
+
+github.com/robertknight
+
+Developer at [Hypothesis](https://hypothes.is)
+
+???
+- I'm a front-end developer at Hypothesis. We make an open source tool
+  for collaboratively annotating web pages.
+- Before that I built native desktop apps for Mac, Windows and Linux.
+
+---
+
+class: middle
+
+.center[![XKCD Compiling](https://imgs.xkcd.com/comics/compiling.png)]
+
+???
+- This talk is about something I had no idea how much I wanted
+  until I tried it.
+- Building user interfaces is all about tweaking things, being able to make
+  changes and see the effects quickly.
+- With static content and simple web apps, where you can express the state
+  in the URL, this is pretty easy. You can set up something like BrowserSync
+  or LiveReload to just reload the page when it detects a change to a file.
+
+---
+
+class:middle
+.center[![Checkpoint Save](images/checkpoint-save.jpg)]
+
+???
+- With a more complex and stateful app, this doesn't work so well. After
+  each tweak you spend a bunch of time getting the app back to the state
+  it was before
+
+---
+
+class: middle
+
+> **hot reloading**
+>
+> */hɒt/ /riːˈləʊd/*
+>
+> *n* Feature that lets you change styling and code in your app
+> and see the changes immediately without having to reload.
+
+???
+- Hot reloading is a feature that lets you change not just
+  the styling, but most of your code, and see the results immediately without
+  having to reload the page.
+- Popularized by React Hot Loader. Cool tech demo, but described by its
+  creator as a hack.
+
+---
+
+class: middle, center
+
+# Demo
+
+???
+- Demo app is a simple dashboard that lets you compare commit
+  activity from different GitHub projects over the past year.
+- { Brief demo of functionality: Add chart, remove chart, zoom in }
+- { Point out that we have multiple charts, so not trivial to put state into URL }
+- { Hot reload demo: Increase height of zoomed-in chart }
+- { Hot reload demo: Tweak chart style }
+- { Hot reload demo: Tweak loading screen. This is where Redux comes in. }
+
+---
+
+# Outline
+
+- How hot reloading works
+- Hot reloading views
+- Principles of Elm/Redux and how they enable hot reloading
+- Remaining challenges
+
+???
+- There are many boilerplate projects online that will give you a basic
+  setup with Webpack/React/Redux that has hot reloading
+- Relying on boilerplate is OK, as long as it works flawlessly
+- This talk is going to focus on how hot reloading works under the hood
+  and the how the principles behind Elm/Redux enable hot reloading and
+  many other useful debugging and development tools.
+- React and Redux are well suited to hot reloading but you can still make use
+  of the ideas even if you have a different stack. Redux in particular is not
+  coupled to any view library.
+
+---
+
+# Ingredients for Hot Reloading
+
+1. Delivering code updates to the browser
+
+???
+- Three main things we need to do in order to implement hot reloading
+- The first is taking a code change to a file and getting it from disk
+  to the browser
+--
+
+1. Updating views
+
+???
+- Once the app has the updated code available to it, it needs to load it
+  somehow and update the components on screen to reflect those changes,
+  preserving as much state as possible.
+- This is where Redux comes in
+
+--
+
+1. Preserving state, even if the model changes
+
+???
+- Lastly, if you make a change that affects the models in your app,
+  we want to try and preserve as much state as possible
+---
+
+# Delivering code updates to the browser
+
+???
+* The first part of enabling hot reloading is delivering code updates to
+  the browser but only for the part of the app which changed.
+* Typically your application is divided into modules - views, models, services,
+  utility code. These modules are then packaged into one or a small number
+  of JavaScript files using Browserify or Webpack which the browser loads.
+* To go from editing code to updating the app, we need logic on the client
+  and server. On the server, we need to generate an incremental update - effectively
+  a mini-bundle that contains only the modules which changed.
+* On the client, we need to fetch and apply that update.
+* Implementations are available for Webpack and Browserify.
+  If you have a new project, I'd recommend going with Webpack because
+  this feature is part of the core and there is more documentation and sample
+  code out there.
+
+---
+
+.full-slide-img[![Module Tree](images/module-tree.svg)]
+
+???
+- App is divided into JS modules which `require()` other modules,
+  with one of the modules designated as the entry point,
+  forming a dependency graph.
+- When a bundle is generated, Webpack generates a manifest file and
+  a module update
+
+---
+
+.full-slide-img[![Module Tree](images/module-tree-numbers.svg)]
+
+???
+- On disk the files require each other by name
+- In the bundle, each module is instead assigned a number and file names
+  in `require()` calls are mapped to numbers
+
+---
+
+class: middle
+
+Anatomy of a Webpack Bundle:
+
+```js
+(function (modules) { /* bootstrap code */})([
+  function(module, exports, require) { /* module 0 (entry point) */
+    var dependency = require(1);
+    var anotherDependency = require(2);
+    ...
+  },
+  function(module, exports, require) { /* module 1 */ },
+  function(module, exports, require) { /* module 2 */ },
+  ...
+])
+```
+
+???
+- The structure of a Webpack or Browserify bundle is actually
+  really simple - one big IIFE.
+- Starts with a bootstrap function which creates the `require()` function
+  and the module cache.
+- As soon as the bundle loads, the bootstrap function is called with an array
+  of functions as an argument.
+- Each function is a module from your original code.
+- Modules reference each other by index in the array.
+- Hot updating involves removing any existing entry from the module cache
+  and replacing it with the function object for the updated module.
+- Updates need to be applied in the right order
+
+---
+
+Enabling hot reloading on the client
+
+```js
+webpack --hot
+```
+
+* Adds an extra chunk of code to the bootstrap (the "HMR runtime")
+* Provides functions for checking for updates and updating the module cache.
+
+---
+
+Initial build:
+
+```sh
+*Hash: 015b66e9275f10ef1b86
+Version: webpack 1.12.12
+Time: 2698ms
+    Asset     Size  Chunks             Chunk Names
+bundle.js  1.06 MB       0  [emitted]  main
+```
+
+In bundle.js:
+
+```js
+...
+var hotApplyOnUpdate = true;
+*var hotCurrentHash = "015b66e9275f10ef1b86";
+var hotCurrentModuleData = {};
+var hotCurrentParents = [];
+...
+```
+
+???
+- When Webpack builds a bundle, it generates a compilation hash.
+  This hash is embedded in the bundle itself.
+- When checking for updates, Webpack will look for a JSON file on the server
+  whose name includes the hash.
+
+---
+
+After a code change:
+
+```sh
+Hash: b444a862c30a14d36321
+Version: webpack 1.12.12
+Time: 318ms
+                               Asset      Size  Chunks             Chunk Names
+                           bundle.js   1.06 MB       0  [emitted]  main
+0.015b66e9275f10ef1b86.hot-update.js    3.9 kB       0  [emitted]  main
+015b66e9275f10ef1b86.hot-update.json  36 bytes          [emitted]
+    + 427 hidden modules
+```
+
+Update manifest: CURRENT_HASH.hot-update.json
+
+```js
+{"h":"b444a862c30a14d36321","c":[0]}
+```
+
+Update content: CHUNK_ID.CURRENT_HASH.hot-update.js
+
+```js
+webpackHotUpdate(<chunk ID>, {
+  <module ID>: function(module, exports, require) {
+    // your new module code
+  }
+});
+```
+
+???
+* When you make a code change, Webpack will perform an incremental build
+  and if hot-module-reloading is enabled, it will also generate
+  an _update manifest_ and _update chunk_
+* The update manifest's name includes the previous compilation's hash,
+  so the client can fetch it. Inside the manifest is the hash of the current
+  compilation
+* The compilation hashes link together the updates in a chain, enabling the
+  client to fetch and apply them in the right order
+* The update chunk is a mapping of module IDs to updated code for that module
+
+---
+
+# The client API
+
+```js
+// Exists if the hot reloading runtime is available
+module.hot = {
+  // Attempt to fetch an update manifest
+  check()
+
+  // Register a handler to be invoked
+  // when 'dependency' or one of _its_
+  // dependencies is updated
+  accept(dependency, callback)
+
+  // Register a handler to be called
+  // when the module is unloaded
+  addDisposeHandler(callback)
+}
+```
+
+???
+- If a module is built with hot reloading enabled, an additional `hot` property
+  is added to the module object.
+- Modules can use these to initiate a check for updates and also declare
+  that they can accept updates for dependencies.
+
+---
+
+.full-slide-img[![Update Check](images/update-check.svg)]
+
+???
+- When the client receives an update, it marks each of the updated modules
+  as outdated
+- Each of the parents of that module is queried to see whether it can accept
+  an update for that dependency, registered with `module.accept()`
+- If the parent can accept the update, the parent's `module.accept()` callback
+  is invoked.
+
+---
+
+.full-slide-img[![Update Check](images/update-check-2.svg)]
+
+???
+- If not, the parent itself is marked as outdated and the search continues up
+  the tree, until we get to the root.
+- In this case, 3 cannot handle updates for 7 itself, so the search continues
+  up to the entry module.
+- Module 0 _can_ handle the update and it will `require()` the new version of
+  module '3', which will also load the new version of module '7' in the process.
+
+---
+
+# Updating Views
+
+???
+- So given the ability to load a new version of some code for a UI
+  component, in order to hot-reload it, we need to update all of the DOM
+  elements in the app to reflect the new version.
+- React makes this easy
+---
+
+class:middle
+
+```js
+function Button(props) {
+  return <button onClick={props.onClick}>Click me</button>;
+}
+```
+
+is equivalent to...
+
+```js
+function Button(props) {
+  return {
+    type: 'button',
+    props: {
+      onClick: props.onClick,
+      children: 'Click me',
+    },
+    // a few other fields omitted
+  }
+}
+```
+
+???
+- In a traditional MVC framework, replacing a component is a tricky thing to do
+- You'd have to find all instances of a component on screen, remove their DOM
+  elements, generate new ones using the updated code and insert them back in place.
+- React components on the other hand are simply functions that return an
+  object describing what the DOM should look like and what event handlers should
+  be attached.
+- This makes hot reloading much easier
+
+---
+
+# Updating views
+
+App.js
+```js
+module.exports = function () {
+  return <div>Hello World</div>;
+}
+```
+
+index.js
+```js
+var App = require('./App');
+ReactDOM.render(<App />, document.getElementById('root'));
+
+*module.hot.accept('./App', function () {
+  App = require('./App');
+  ReactDOM.render(<App />, document.getElementById('root'));
+});
+```
+
+???
+- This is the "hot reloading" Hello World with React
+
+---
+
+class:middle
+
+- If you are using Babel, you can use `react-transform-hmr` to
+  do this for you
+- Stateful components require a bit more work, handled by `react-proxy`
+
+---
+
+- So that deals with updating the views, but how do we preserve
+  the state of the application?
+- What if we want to make changes to models as well as views?
+- This is where Redux comes in
+
+---
+
+class: middle
+
+- Inspired by _Elm_, a functional compile-to-JavaScript language.
+- Components in Elm are stateless, just a collection of 3 functions.
+
+```ts
+interface Component {
+  view(action signal, model): Html,
+  update(model, action): Model,
+  initialState(): Model,
+}
+```
+
+???
+- Redux is inspired by Elm and in particular a way of structuring a UI
+  referred to as the 'Elm architecture'.
+- An Elm component has 3 main functions, one to get the initial state for
+  the component, one to get the new state given the current state and an action
+  and finally one that takes the state and returns a description of the UI
+- Important to notice: The component has all the logic to process the state,
+  but doesn't actually store any of it.
+- This means you can replace the component with a new version without losing
+  the state.
+
+---
+
+# Three Basic Principles
+
+1 - Store all of your application's state in a single, immutable object.
+
+```js
+{
+  charts: [{
+    repository: 'facebook/react',
+    isLoading: false,
+    data: [...],
+  },
+    ...
+  ],
+  focusedChart: 0,
+}
+```
+
+_Better yet: Make it a **plain JavaScript object**_
+
+???
+- The first principle is that the state of your app is stored in a single,
+  immutable object, separate from the logic that updates it.
+- This enables a lot of useful debug tools on its own. For example,
+  you can easily expose the store as a property on the 'window' object
+  for easy inspection in dev tools.
+{Show state in demo app}
+- Why immutable? That enforces that there is only one way to update it.
+
+---
+
+2 - The only way to change the state is by calling a `dispatch()` function
+    with an 'action', which is just a plain JavaScript object describing
+    what happened.
+
+   ```js
+   function setRepository(name) {
+     return {
+       type: 'SET_REPOSITORY',
+       repository: name,
+     };
+   }
+
+   // in the 'onSubmit' handler for the form where the user
+   // chooses a repository to view
+   store.dispatch(setRepository(name));
+   ```
+
+---
+
+3 - State updates are made by a collection of functions (called 'reducers'),
+    which take the current state, the action and return the new state.
+
+```js
+var initialState = {
+  repository: undefined,
+};
+
+function chart(state, action) {
+  switch (action.type) {
+    case 'SET_REPOSITORY':
+      return Object.assign({}, state, {
+        repository: action.repository,
+      });
+    default:
+      return state || initialState;
+  }
+}
+```
+
+???
+- State updates happen by calling a function on the store, `dispatch()`
+  and passing it an object describing what happened.
+- In our example app, we have actions for the user selecting a repository,
+  data being fetched from the GitHub API and the user zooming into or out
+  of a chart.
+  {Show actions in debug tools}
+
+---
+
+# The Redux API
+
+```js
+createStore(reducer, initialState);
+
+store: {
+  dispatch: function(action) {
+    // call reducer(getState(), action) and replace
+    // the state with the result
+  },
+
+  subscribe: function(listener) {
+    // add a listener which will be called whenever the
+    // state changes
+  },
+
+  getState: function() {
+    // returns the current state of the application
+  },
+
+  replaceReducer: function (reducer) {
+    // replace the 'reducer' function, this enables
+    // live code updates
+  }
+}
+```
+
+???
+- The basic API of a store is extremely simple. Call `createStore()` and
+  get back an object with functions to get the current state of the app,
+  list for state changes, and dispatch actions to trigger state changes.
+---
+
+# Poor man's hot reloading
+
+- Persist state to `window.localStorage` or `window.hash`
+- Restore on load
+
+```js
+var initialState = JSON.parse(atob(window.location.hash.slice(1)) || 'null');
+var store = redux.createStore(rootReducer, initialState);
+
+store.subscribe(function () {
+  window.location.hash = JSON.stringify(btoa(store.getState()));
+});
+```
+
+???
+- By storing all our app state in a single object, we can already implement
+  a simple hot reloading hack.
+- Every time the app state changes, we'll serialize it and put it in
+  `window.hash`
+- If we reload the app, we'll deserialize that state.
+{Let's go and try it out!}
+
+---
+
+# Hot Reloading with Redux
+
+```js
+var reducer = require('./rootReducer');
+
+if (module.hot) {
+  module.hot.accept('./rootReducer', function () {
+    reducer = require('./rootReducer');
+    store.replaceReducer(reducer);
+  });
+}
+```
+
+---
+
+# Challenges
+
+???
+- This covers the basics, now I'll take a look at aspects of
+  hot reloading and React/Redux which are still maturing and
+  problems you might run into.
+
+---
+
+# Error handling
+
+- React will get stuck in a broken state if component render function  throws
+- Improvements ("error boundaries") coming in v0.15
+- Redux copes pretty well - you just get the old state back
+
+```js
+// createStore.js
+try {
+  isDispatching = true
+  currentState = currentReducer(currentState, action)
+} finally {
+  isDispatching = false
+}
+```
+???
+
+- This is JavaScript. It may shock you to learn that even after Babel
+  compiles it, it may still have bugs.
+- What happens if an exception is thrown whilst trying to load the new code?
+- Fortunately, since components are just functions, you can wrap them with
+  another component which catches the exception.
+
+---
+
+class: middle
+
+```js
+function catchErrors(Component) {
+  var wrapped = function () {
+    try {
+      return Component.apply(this, arguments);
+    } catch (err) {
+      return <ErrorBox name={name} error={err}/>;
+    }
+  };
+  wrapped.displayName = name;
+  return wrapped;
+}
+
+MyComponent = catchErrors(MyComponent)
+```
+
+???
+{Live demo of error handling}
+
+---
+
+# State outside your app and the DOM
+
+- `setInterval()`
+- Async sequences
+
+???
+- In event handlers, you might kick off a series of async actions which
+  might dispatch actions as a result.
+- Changes to this code typically isn't reflected until the next time you trigger
+  the action.
+
+---
+
+class: middle
+
+github.com/robertknight/hot-reloading-talk
+
+Rob Knight
+
+@robknight_
+
+???
+- Code for the example app is up on GitHub. It is intended as an explanation
+  for how things work rather than code you should copy and paste into
+  a new project.
+- Also, inevitable plug. If you find this topic interesting, Hypothesis
+  is hiring an interface developer. Come talk to me!
+
+    </textarea>
+    <script src="scripts/remark.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create({
+        highlightStyle: 'zenburn',
+        highlightLines: true,
+        ratio: '4:3',
+      });
+    </script>
+  </body>
+</html>
