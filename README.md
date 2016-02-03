@@ -1,27 +1,19 @@
 # Hot Reloadable Web Apps with React and Redux
 
 This is a talk given at the [LondonJS](http://www.meetup.com/London-JavaScript-Community/)
-meetup group about the UI architecture of React/Redux applications and how
-it enables hot reloading and useful debugging tools.
+meetup group about how hot reloading works and how it is enabled by Elm-style architecture for web apps using React/Redux.
 
 ## GitHub Stats Dashboard demo app
 
-This is a demo app to illustrate how React/Redux-style
-architecture for UIs enables hot reloading and useful
-debugging tools.
+This is a demo app to illustrate how to implement hot reloading using React/Redux "from scratch", rather than relying on the existing Webpack plugins.
 
 There are a few things you should bear in mind if you want
 to use the code here as a basis for supporting hot reloading
 and similar debug tools in your own app:
 
 * The code here is intended to be explicit for people who
-  are not familiar with Redux's API. Redux and React Redux provide
-  utilities for adding middleware (eg. for logging actions), passing
-  data from the store to components and enabling
-  efficient updates which you should use instead.
-
-  See [react-redux](https://github.com/rackt/react-redux) for
-  more information.
+  are not familiar with Redux's API. See the [Redux video tutorial](https://egghead.io/series/getting-started-with-redux)
+  and examples for a guide that explains best practices for structuring your app.
 
 * The code here is written with classic ES5-era JavaScript
   for simplicity.
@@ -35,15 +27,22 @@ and similar debug tools in your own app:
 
 ## Setup
 
-```
-npm install
+1. Install and start the app
 
-# Start development server
-# (the --hot option adds the client-side Hot Module Reloading plugin
-#  to the Webpack bundle)
-npm start
-open http://localhost:8080
-```
+  ```
+  npm install
+  npm start
+  open http://localhost:8080
+  ```
+
+2. Enter 'organization/repository' (eg. 'jquery/jquery') in the box
+   for one of the charts and click 'Fetch Stats'
+
+3. Open the 'ActivityChart.js' source file and in the `convertCommitStats()`
+   function, change the values for the `strokeColor` or `fillColor` properties.
+
+4. Switch back to the app. You should see the code changes reflected
+   live and the state of the app preserved.
 
 ## Hot Reloading Limitations and Caveats
 
