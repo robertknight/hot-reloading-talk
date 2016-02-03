@@ -1,5 +1,8 @@
 var GITHUB_API_ROOT = 'https://api.github.com';
 
+// fake local server for offline testing
+//GITHUB_API_ROOT = 'http://localhost:3002';
+
 /**
  * The types of actions that can be performed on a single
  * ActivityChart
