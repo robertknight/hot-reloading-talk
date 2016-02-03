@@ -167,8 +167,8 @@ class: middle, center
 - App is divided into JS modules which `require()` other modules,
   with one of the modules designated as the entry point,
   forming a dependency graph.
-- When a bundle is generated, Webpack generates a manifest file and
-  a module update
+- When a bundle is generated, Webpack generates a manifest file describing
+  what changed and a JavaScript file containing the updated modules
 
 ---
 
@@ -183,7 +183,7 @@ class: middle, center
 
 class: middle
 
-Anatomy of a Webpack Bundle:
+Anatomy of a Webpack Bundle*
 
 ```js
 (function (modules) { /* bootstrap code */})([
@@ -197,6 +197,8 @@ Anatomy of a Webpack Bundle:
   ...
 ])
 ```
+
+*_Browserify_ bundles are very similar
 
 ???
 - The structure of a Webpack or Browserify bundle is actually
@@ -219,7 +221,8 @@ Enabling hot reloading on the client
 webpack --hot
 ```
 
-* Adds an extra chunk of code to the bootstrap (the "HMR runtime")
+* Enables the 'Hot Module Runtime' plugin
+* This adds an extra chunk of code to the bootstrap (the "HMR runtime")
 * Provides functions for checking for updates and updating the module cache.
 
 ---
@@ -357,6 +360,9 @@ module.hot = {
 
 class:middle
 
+React components are functions that return an object _describing_ what
+should be in the DOM.
+
 ```js
 function Button(props) {
   return <button onClick={props.onClick}>Click me</button>;
@@ -416,9 +422,11 @@ ReactDOM.render(<App />, document.getElementById('root'));
 
 class:middle
 
-- If you are using Babel, you can use `react-transform-hmr` to
-  do this for you
-- Stateful components require a bit more work, handled by `react-proxy`
+- If you are using Babel, the `react-transform-hmr` plugin can be used
+  to rewrite your code at compile time to add `module.hot` calls and reload
+  the component
+- Caveat: `react-transform-hmr` does not yet support stateless function
+  components.
 
 ---
 
@@ -434,24 +442,51 @@ class: middle
 - Inspired by _Elm_, a functional compile-to-JavaScript language.
 - Components in Elm are stateless, just a collection of 3 functions.
 
-```ts
-interface Component {
-  view(action signal, model): Html,
-  update(model, action): Model,
-  initialState(): Model,
-}
-```
+---
+
+class: middle
+
+.large-slide-img[![Elm Component](images/elm-component.svg)]
 
 ???
 - Redux is inspired by Elm and in particular a way of structuring a UI
   referred to as the 'Elm architecture'.
-- An Elm component has 3 main functions, one to get the initial state for
+- An Elm component consists of 3 pure functions, one to get the initial state for
   the component, one to get the new state given the current state and an action
   and finally one that takes the state and returns a description of the UI
-- Important to notice: The component has all the logic to process the state,
-  but doesn't actually store any of it.
-- This means you can replace the component with a new version without losing
-  the state.
+- Important to notice for hot reloading: Component is entirely pure. Contains
+  the logic to manage the state but doesn't store it. Therefore, to do
+  a hot reload, we just need to change the arrows on the left to point
+  to the new version.
+
+---
+
+.large-slide-img[![Elm Component](images/elm-component-reload-1.svg)]
+
+???
+- Since the component is pure, in order to replace it with a new version
+  at runtime, all we need to do is redirect the input arrows that feed
+  state updates and the action signal into it to point to the new
+  version
+
+---
+
+.large-slide-img[![Elm Component](images/elm-component-reload-2.svg)]
+
+---
+
+class: middle
+
+.large-slide-img[![React/Redux Component](images/react-redux-component.svg)]
+
+???
+- By constrast, this is the architecture of React/Redux
+- The data flow is the same. The main difference is that
+  whereas in Elm the three functions are part of the same component,
+  here the view part is React, the update/init parts are merged together
+  into a single 'reducer' function in Redux
+- The view and reducer components are still pure, so hot reloading works
+  the same way
 
 ---
 
@@ -617,26 +652,25 @@ if (module.hot) {
 
 # Error handling
 
-- React will get stuck in a broken state if component render function  throws
-- Improvements ("error boundaries") coming in v0.15
-- Redux copes pretty well - you just get the old state back
-
-```js
-// createStore.js
-try {
-  isDispatching = true
-  currentState = currentReducer(currentState, action)
-} finally {
-  isDispatching = false
-}
-```
 ???
-
 - This is JavaScript. It may shock you to learn that even after Babel
   compiles it, it may still have bugs.
 - What happens if an exception is thrown whilst trying to load the new code?
+
+--
+
+- React will get stuck in a broken state if component render function  throws
+- Wrap `render()` method to catch errors and render a fallback instead.
+- The `react-transform-catch-errors` Babel plugin will do this for you
+- Improvements ("error boundaries") coming in v0.15
+
+???
+- Out of the box, React currently does not cope very well.
+- If a component throws an error whilst rendering, React will get stuck in
+  an invalid internal state where subsequent renders will fail.
 - Fortunately, since components are just functions, you can wrap them with
-  another component which catches the exception.
+  another function which catches the exception and renders something else.
+  {DEMO}
 
 ---
 
@@ -646,12 +680,15 @@ class: middle
 function catchErrors(Component) {
   var wrapped = function () {
     try {
+      // try to render the component normally
       return Component.apply(this, arguments);
     } catch (err) {
-      return <ErrorBox name={name} error={err}/>;
+      // something went wrong, replace it with a big red box
+      // displaying the error message and stack trace
+      return <ErrorBox name={Component.name} error={err}/>;
     }
   };
-  wrapped.displayName = name;
+  wrapped.displayName = Component.name;
   return wrapped;
 }
 
@@ -660,6 +697,35 @@ MyComponent = catchErrors(MyComponent)
 
 ???
 {Live demo of error handling}
+
+---
+
+- Redux on the other hand copes much better
+- If a reducer throws, you just get the previous state back
+
+```js
+// createStore.js
+
+function dispatch(action) {
+  ...
+  try {
+    isDispatching = true
+    currentState = currentReducer(currentState, action)
+  } finally {
+    // ... something went wrong, currentState will simply
+    // remain unchanged
+    isDispatching = false
+  }
+  ...
+}
+```
+???
+- Thanks to the store being immutable and state changes happening via
+  pure functions, Redux copes much better.
+- If a reducer throws, the state remains unchanged. You can then just fix
+  your code and reload the app
+- If a bug results in corrupt state in the store, you can fix this by replaying
+  all of the actions.
 
 ---
 
@@ -673,6 +739,15 @@ MyComponent = catchErrors(MyComponent)
   might dispatch actions as a result.
 - Changes to this code typically isn't reflected until the next time you trigger
   the action.
+
+---
+
+# Summary
+
+- Hot reloading is a useful productivity tool, but really just one of
+  many productivity/debugging tools enabled by the architecture
+- Robust hot reloading is not just a build system feature, needs
+  an app architecture that separates state and logic
 
 ---
 
