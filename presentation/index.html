@@ -19,6 +19,10 @@ github.com/robertknight/hot-reloading-talk
 ???
 - This talk was originally called "Fast iteration on complex applications with Redux".
 - That's not very snappy. I'm going to try again - this is "Hot Reloading with React and Redux".
+- I'm expecting quite a mix of experience here, I'm going to try and make
+  this accessible to people who are not familiar with React or Redux and
+  hopefully there are some ideas here which might be useful even if you're
+  not using either.
 
 ---
 
@@ -169,8 +173,6 @@ class: middle, center
 - App is divided into JS modules which `require()` other modules,
   with one of the modules designated as the entry point,
   forming a dependency graph.
-- When a bundle is generated, Webpack generates a manifest file describing
-  what changed and a JavaScript file containing the updated modules
 
 ---
 
@@ -207,6 +209,9 @@ Anatomy of a Webpack Bundle*
   really simple - one big IIFE.
 - Starts with a bootstrap function which creates the `require()` function
   and the module cache.
+- The module cache is an object that maps module numbers to
+  module functions. A module function is your original code for a module,
+  wrapped in a function.
 - As soon as the bundle loads, the bootstrap function is called with an array
   of functions as an argument.
 - Each function is a module from your original code.
@@ -251,6 +256,9 @@ var hotCurrentParents = [];
 ```
 
 ???
+- When the client checks for updates, it needs to indicate which
+  version of the code it currently has, so it can download the right
+  changes.
 - When Webpack builds a bundle, it generates a compilation hash.
   This hash is embedded in the bundle itself.
 - When checking for updates, Webpack will look for a JSON file on the server
@@ -430,7 +438,13 @@ class:middle
 - Caveat: `react-transform-hmr` does not yet support stateless function
   components.
 
+???
+- The reason why 'react-transform-hmr' does not support function components
+  is interesting.
+
 ---
+
+class: middle
 
 - So that deals with updating the views, but how do we preserve
   the state of the application?
@@ -442,7 +456,11 @@ class:middle
 class: middle
 
 - Inspired by _Elm_, a functional compile-to-JavaScript language.
-- Components in Elm are stateless, just a collection of 3 functions.
+- Components in Elm are stateless, just a collection of 3 functions
+
+???
+- Redux started as a project to enable hot reloading in
+  a robust way.
 
 ---
 
@@ -453,9 +471,11 @@ class: middle
 ???
 - Redux is inspired by Elm and in particular a way of structuring a UI
   referred to as the 'Elm architecture'.
-- An Elm component consists of 3 pure functions, one to get the initial state for
-  the component, one to get the new state given the current state and an action
-  and finally one that takes the state and returns a description of the UI
+- A UI component in Elm consists of 3 pure functions: One to get the
+  initial state for the component, one that takes the state and
+  returns a description of the UI to render given that state and finally 
+  one to get the new state given the current state and an action.
+- An 'action' is something like a mouse click, or a WebSocket message
 - Important to notice for hot reloading: Component is entirely pure. Contains
   the logic to manage the state but doesn't store it. Therefore, to do
   a hot reload, we just need to change the arrows on the left to point
