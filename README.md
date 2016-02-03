@@ -3,6 +3,8 @@
 This is a talk given at the [LondonJS](http://www.meetup.com/London-JavaScript-Community/)
 meetup group about how hot reloading works and how it is enabled by Elm-style architecture for web apps using React/Redux.
 
+**[Presentation Slides](https://robertknight.github.io/hot-reloading-talk)**
+
 ## GitHub Stats Dashboard demo app
 
 This is a demo app to illustrate how to implement hot reloading using React/Redux "from scratch", rather than relying on the existing Webpack plugins.
