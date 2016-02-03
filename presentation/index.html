@@ -12,6 +12,8 @@ class: center, middle
 
 # Hot Reloading with React and Redux
 
+github.com/robertknight/hot-reloading-talk
+
 .hint[Press 'P' for slide notes]
 
 ???
@@ -638,6 +640,13 @@ if (module.hot) {
   });
 }
 ```
+
+???
+- Redux provides a `replaceReducer()` API which lets you replace the reducer
+  function.
+- If you have the dev tools enabled, all of the actions will be replayed,
+  allowing you to see the effects of reducer changes live.
+- { Demo fixing bug when resetting repo whilst zoomed in }
 
 ---
 
