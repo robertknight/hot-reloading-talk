@@ -10,19 +10,11 @@
 
 class: center, middle
 
-# Hot Reloading with React and Redux
+# Hot Reloading
 
 github.com/robertknight/hot-reloading-talk
 
 .hint[Press 'P' for slide notes]
-
-???
-- This talk was originally called "Fast iteration on complex applications with Redux".
-- That's not very snappy. I'm going to try again - this is "Hot Reloading with React and Redux".
-- I'm expecting quite a mix of experience here, I'm going to try and make
-  this accessible to people who are not familiar with React or Redux and
-  hopefully there are some ideas here which might be useful even if you're
-  not using either.
 
 ---
 
@@ -37,9 +29,10 @@ github.com/robertknight
 Developer at [Hypothesis](https://hypothes.is)
 
 ???
-- I'm a front-end developer at Hypothesis. We make an open source tool
-  for collaboratively annotating web pages.
-- Before that I built native desktop apps for Mac, Windows and Linux.
+- I'm a front-end developer at Hypothesis. We make open source tools for
+  annotating the web.
+- My experience is mostly with React but I'm interested in how the ideas
+  can be useful for other frameworks, or no framework at all.
 
 ---
 
@@ -48,13 +41,11 @@ class: middle
 .center[![XKCD Compiling](https://imgs.xkcd.com/comics/compiling.png)]
 
 ???
-- This talk is about something I had no idea how much I wanted
-  until I tried it.
 - Building user interfaces is all about tweaking things, being able to make
   changes and see the effects quickly.
 - With static content and simple web apps, where you can express the state
-  in the URL, this is pretty easy. You can set up something like BrowserSync
-  or LiveReload to just reload the page when it detects a change to a file.
+  in the URL, this is pretty easy. Make a change, reload the page.
+  `ember serve` of course does this for you with built-in Live Reloading.
 
 ---
 
@@ -68,21 +59,27 @@ class:middle
 
 ---
 
+**hot reloading** vs **LiveReload**
+
+???
+- LiveReload and BrowserSync can reload images and styles automatically.
+- When code changes however, they reload the whole app.
+
+---
+
 class: middle
 
 > **hot reloading**
 >
 > */hɒt/ /riːˈləʊd/*
 >
-> *n* Feature that lets you change styling and code in your app
-> and see the changes immediately without having to reload.
+> *n* Feature that lets you change styling and _code_ in your app
+> and see the changes immediately without losing state.
 
 ???
-- Hot reloading is a feature that lets you change not just
-  the styling, but most of your code, and see the results immediately without
-  having to reload the page.
-- Popularized by React Hot Loader. Cool tech demo, but described by its
-  creator as a hack.
+- Hot reloading is a feature that lets you change the _code_ of your app,
+  for views, models and business logic.
+- Time for a demo
 
 ---
 
@@ -106,7 +103,7 @@ class: middle, center
 - How hot reloading works
 - Hot reloading views
 - Principles of Elm/Redux and how they enable hot reloading
-- Remaining challenges
+- Hot reloading and Ember
 
 ???
 - There are many boilerplate projects online that will give you a basic
@@ -670,104 +667,18 @@ if (module.hot) {
 
 ---
 
-# Challenges
+# Hot Reloading with Ember?
 
 ???
-- This covers the basics, now I'll take a look at aspects of
-  hot reloading and React/Redux which are still maturing and
-  problems you might run into.
+- How can we make use of this in Ember?
 
 ---
 
-# Error handling
+1. Use Redux directly or via ember-redux
 
 ???
-- This is JavaScript. It may shock you to learn that even after Babel
-  compiles it, it may still have bugs.
-- What happens if an exception is thrown whilst trying to load the new code?
-
---
-
-- React will get stuck in a broken state if component render function  throws
-- Wrap `render()` method to catch errors and render a fallback instead.
-- The `react-transform-catch-errors` Babel plugin will do this for you
-- Improvements ("error boundaries") coming in v0.15
-
-???
-- Out of the box, React currently does not cope very well.
-- If a component throws an error whilst rendering, React will get stuck in
-  an invalid internal state where subsequent renders will fail.
-- Fortunately, since components are just functions, you can wrap them with
-  another function which catches the exception and renders something else.
-  {DEMO}
-
----
-
-class: middle
-
-```js
-function catchErrors(Component) {
-  var wrapped = function () {
-    try {
-      // try to render the component normally
-      return Component.apply(this, arguments);
-    } catch (err) {
-      // something went wrong, replace it with a big red box
-      // displaying the error message and stack trace
-      return <ErrorBox name={Component.name} error={err}/>;
-    }
-  };
-  wrapped.displayName = Component.name;
-  return wrapped;
-}
-
-MyComponent = catchErrors(MyComponent)
-```
-
-???
-{Live demo of error handling}
-
----
-
-- Redux on the other hand copes much better
-- If a reducer throws, you just get the previous state back
-
-```js
-// createStore.js
-
-function dispatch(action) {
-  ...
-  try {
-    isDispatching = true
-    currentState = currentReducer(currentState, action)
-  } finally {
-    // ... something went wrong, currentState will simply
-    // remain unchanged
-    isDispatching = false
-  }
-  ...
-}
-```
-???
-- Thanks to the store being immutable and state changes happening via
-  pure functions, Redux copes much better.
-- If a reducer throws, the state remains unchanged. You can then just fix
-  your code and reload the app
-- If a bug results in corrupt state in the store, you can fix this by replaying
-  all of the actions.
-
----
-
-# State outside your app and the DOM
-
-- `setInterval()`
-- Async sequences
-
-???
-- In event handlers, you might kick off a series of async actions which
-  might dispatch actions as a result.
-- Changes to this code typically isn't reflected until the next time you trigger
-  the action.
+- Redux is a very small library and not tied to any
+  particular view framework.
 
 ---
 
@@ -789,11 +700,6 @@ Rob Knight
 @robknight_
 
 ???
-- Code for the example app is up on GitHub. It is intended as an explanation
-  for how things work rather than code you should copy and paste into
-  a new project.
-- Also, inevitable plug. If you find this topic interesting, Hypothesis
-  is hiring an interface developer. Come talk to me!
 
     </textarea>
     <script src="scripts/remark.min.js">
