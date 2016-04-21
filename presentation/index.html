@@ -29,8 +29,7 @@ github.com/robertknight
 Developer at [Hypothesis](https://hypothes.is)
 
 ???
-- I'm a front-end developer at Hypothesis. We make open source tools for
-  annotating the web.
+- I'm a developer at Hypothesis. We make open source tools for annotating the web.
 - My experience is mostly with React but I'm interested in how the ideas
   can be useful for other frameworks, or no framework at all.
 
@@ -41,29 +40,44 @@ class: middle
 .center[![XKCD Compiling](https://imgs.xkcd.com/comics/compiling.png)]
 
 ???
+
+(Shorten the below, the audience knows this)
+
 - Building user interfaces is all about tweaking things, being able to make
   changes and see the effects quickly.
-- With static content and simple web apps, where you can express the state
-  in the URL, this is pretty easy. Make a change, reload the page.
-  `ember serve` of course does this for you with built-in Live Reloading.
+- With static content and simple web apps this is easy:
+  Make a change, then press a key to reload the page.
 
 ---
 
-class:middle
-.center[![Checkpoint Save](images/checkpoint-save.jpg)]
+class: middle
+
+## LiveReload with Ember CLI
+
+- Run `ember serve`
+- Edit styles → Styles reloads automatically
+- Edit JavaScript → Page reloads automatically.
 
 ???
-- With a more complex and stateful app, this doesn't work so well. After
-  each tweak you spend a bunch of time getting the app back to the state
-  it was before
+- Out of the box, Ember CLI goes a step further and takes care of
+  reloading your app automatically when styles or code changes.
 
 ---
 
-**hot reloading** vs **LiveReload**
+class: middle
+
+## LiveReload with Ember CLI
+
+- Run `ember serve`
+- Edit styles → Styles reloads automatically
+- *Edit JavaScript → Page reloads automatically* → **Loses state**
 
 ???
-- LiveReload and BrowserSync can reload images and styles automatically.
-- When code changes however, they reload the whole app.
+- There is a limitation with this part though, any state
+  that hasn't been persisted to the server, to local storage
+  or in the URL is lost.
+- Can we do better? Can we make it possible to edit code and
+  not lose state.
 
 ---
 
@@ -73,12 +87,10 @@ class: middle
 >
 > */hɒt/ /riːˈləʊd/*
 >
-> *n* Feature that lets you change styling and _code_ in your app
+> *n* Feature that lets you change _code_ in your app
 > and see the changes immediately without losing state.
 
 ???
-- Hot reloading is a feature that lets you change the _code_ of your app,
-  for views, models and business logic.
 - Time for a demo
 
 ---
@@ -100,21 +112,20 @@ class: middle, center
 
 # Outline
 
-- How hot reloading works
-- Hot reloading views
-- Principles of Elm/Redux and how they enable hot reloading
-- Hot reloading and Ember
+1. Hot reloading JavaScript modules
+1. Replacing components at runtime
+1. Preserving state
+1. Hot reloading and Ember
 
 ???
-- There are many boilerplate projects online that will give you a basic
-  setup with Webpack/React/Redux that has hot reloading
-- Relying on boilerplate is OK, as long as it works flawlessly
-- This talk is going to focus on how hot reloading works under the hood
-  and the how the principles behind Elm/Redux enable hot reloading and
-  many other useful debugging and development tools.
-- React and Redux are well suited to hot reloading but you can still make use
-  of the ideas even if you have a different stack. Redux in particular is not
-  coupled to any view library.
+- I've covered what hot reloading is and why it is useful.
+- Now I'll explain the basics of how it works.
+  - Getting updated code from editor to browser
+  - Replacing existing UI components with new versions
+  - Preserving the state of your app when loading new versions
+    of components.
+- I'm going to explain how this works with Webpack, React and Redux and
+  then I'll talk about applying this to Ember
 
 ---
 
@@ -123,341 +134,184 @@ class: middle, center
 1. Delivering code updates to the browser
 
 ???
-- Three main things we need to do in order to implement hot reloading
-- The first is taking a code change to a file and getting it from disk
-  to the browser
---
-
-1. Updating views
-
-???
-- Once the app has the updated code available to it, it needs to load it
-  somehow and update the components on screen to reflect those changes,
-  preserving as much state as possible.
-- This is where Redux comes in
+- The first is step is to get a code change from a file on disk into the browser,
+  and give the existing code on the page a way to make use of
+  that new code.
 
 --
 
-1. Preserving state, even if the model changes
+1. Updating components
 
 ???
-- Lastly, if you make a change that affects the models in your app,
-  we want to try and preserve as much state as possible
+- If there are any outputs of the old code active on the page, they need
+  to be updated to reflect the new code.
+- The most obvious kind of output on the page are DOM elements created
+  by components.
+- We need to replace those elements to reflect the visual appearance and
+  behavior of the new version of a component.
+
+--
+
+1. Preserving state
+
+???
+- When we replace components, we want to preserve the state of the
+  app as far as possible.
 ---
 
-# Delivering code updates to the browser
+## Hot Module Replacement
+- System for delivering code updates to the browser
+- Bundler (Webpack, Browserify, JSPM, ...)
+- Client runtime
 
 ???
-* The first part of enabling hot reloading is delivering code updates to
-  the browser but only for the part of the app which changed.
-* Typically your application is divided into modules - views, models, services,
-  utility code. These modules are then packaged into one or a small number
-  of JavaScript files using Browserify or Webpack which the browser loads.
-* To go from editing code to updating the app, we need logic on the client
-  and server. On the server, we need to generate an incremental update - effectively
-  a mini-bundle that contains only the modules which changed.
-* On the client, we need to fetch and apply that update.
-* Implementations are available for Webpack and Browserify.
-  If you have a new project, I'd recommend going with Webpack because
-  this feature is part of the core and there is more documentation and sample
-  code out there.
+* In Webpack, Hot Module Replacement is a system for delivering updated versions of individual modules to the page.
+* There are two parts to it, one is the module bundler and the other
+  is a small client runtime.
 
 ---
 
 .full-slide-img[![Module Tree](images/module-tree.svg)]
 
 ???
-- App is divided into JS modules which `require()` other modules,
-  with one of the modules designated as the entry point,
-  forming a dependency graph.
+- App is divided into modules which depend on each other.
+  One of the modules is the entry point, forming a dependency graph.
 
 ---
 
 .full-slide-img[![Module Tree](images/module-tree-numbers.svg)]
 
 ???
-- On disk the files require each other by name
-- In the bundle, each module is instead assigned a number and file names
-  in `require()` calls are mapped to numbers
+- When you edit a file on disk, Webpack generates an incremental update
+  containing only the code for the module which changed.
+- It notifies the client about the change using a WebSocket message.
+- The client runtime then fetches the updated code
+- The logic for _applying_ the changes is app specific, so your modules
+  provide the code for that.
 
 ---
 
 class: middle
 
-Anatomy of a Webpack Bundle*
+- Client knows about dependency graph
+- Modules register which dependencies they can process updates for
+  using **module.hot** API
 
 ```js
-(function (modules) { /* bootstrap code */})([
-  function(module, exports, require) { /* module 0 (entry point) */
-    var dependency = require(1);
-    var anotherDependency = require(2);
-    ...
-  },
-  function(module, exports, require) { /* module 1 */ },
-  function(module, exports, require) { /* module 2 */ },
-  ...
-])
-```
+// Register a callback for when a new version of 'Button'
+// is available
+module.hot.accept('./components/Button', () => {
+  // 1. Load new version of component
+  var NewFileList = require('./components/Button');
 
-*_Browserify_ bundles are very similar
+  // 2. ???
 
-???
-- The structure of a Webpack or Browserify bundle is actually
-  really simple - one big IIFE.
-- Starts with a bootstrap function which creates the `require()` function
-  and the module cache.
-- The module cache is an object that maps module numbers to
-  module functions. A module function is your original code for a module,
-  wrapped in a function.
-- As soon as the bundle loads, the bootstrap function is called with an array
-  of functions as an argument.
-- Each function is a module from your original code.
-- Modules reference each other by index in the array.
-- Hot updating involves removing any existing entry from the module cache
-  and replacing it with the function object for the updated module.
-- Updates need to be applied in the right order
-
----
-
-Enabling hot reloading on the client
-
-```js
-webpack --hot
-```
-
-* Enables the 'Hot Module Runtime' plugin
-* This adds an extra chunk of code to the bootstrap (the "HMR runtime")
-* Provides functions for checking for updates and updating the module cache.
-
----
-
-Initial build:
-
-```sh
-*Hash: 015b66e9275f10ef1b86
-Version: webpack 1.12.12
-Time: 2698ms
-    Asset     Size  Chunks             Chunk Names
-bundle.js  1.06 MB       0  [emitted]  main
-```
-
-In bundle.js:
-
-```js
-...
-var hotApplyOnUpdate = true;
-*var hotCurrentHash = "015b66e9275f10ef1b86";
-var hotCurrentModuleData = {};
-var hotCurrentParents = [];
-...
-```
-
-???
-- When the client checks for updates, it needs to indicate which
-  version of the code it currently has, so it can download the right
-  changes.
-- When Webpack builds a bundle, it generates a compilation hash.
-  This hash is embedded in the bundle itself.
-- When checking for updates, Webpack will look for a JSON file on the server
-  whose name includes the hash.
-
----
-
-After a code change:
-
-```sh
-Hash: b444a862c30a14d36321
-Version: webpack 1.12.12
-Time: 318ms
-                               Asset      Size  Chunks             Chunk Names
-                           bundle.js   1.06 MB       0  [emitted]  main
-0.015b66e9275f10ef1b86.hot-update.js    3.9 kB       0  [emitted]  main
-015b66e9275f10ef1b86.hot-update.json  36 bytes          [emitted]
-    + 427 hidden modules
-```
-
-Update manifest: CURRENT_HASH.hot-update.json
-
-```js
-{"h":"b444a862c30a14d36321","c":[0]}
-```
-
-Update content: CHUNK_ID.CURRENT_HASH.hot-update.js
-
-```js
-webpackHotUpdate(<chunk ID>, {
-  <module ID>: function(module, exports, require) {
-    // your new module code
-  }
+  // 3. Profit!
 });
 ```
-
-???
-* When you make a code change, Webpack will perform an incremental build
-  and if hot-module-reloading is enabled, it will also generate
-  an _update manifest_ and _update chunk_
-* The update manifest's name includes the previous compilation's hash,
-  so the client can fetch it. Inside the manifest is the hash of the current
-  compilation
-* The compilation hashes link together the updates in a chain, enabling the
-  client to fetch and apply them in the right order
-* The update chunk is a mapping of module IDs to updated code for that module
-
----
-
-# The client API
-
-```js
-// Exists if the hot reloading runtime is available
-module.hot = {
-  // Attempt to fetch an update manifest
-  check()
-
-  // Register a handler to be invoked
-  // when 'dependency' or one of _its_
-  // dependencies is updated
-  accept(dependency, callback)
-
-  // Register a handler to be called
-  // when the module is unloaded
-  addDisposeHandler(callback)
-}
-```
-
-???
-- If a module is built with hot reloading enabled, an additional `hot` property
-  is added to the module object.
-- Modules can use these to initiate a check for updates and also declare
-  that they can accept updates for dependencies.
-
----
-
-.full-slide-img[![Update Check](images/update-check.svg)]
-
-???
-- When the client receives an update, it marks each of the updated modules
-  as outdated
-- Each of the parents of that module is queried to see whether it can accept
-  an update for that dependency, registered with `module.accept()`
-- If the parent can accept the update, the parent's `module.accept()` callback
-  is invoked.
-
----
-
-.full-slide-img[![Update Check](images/update-check-2.svg)]
-
-???
-- If not, the parent itself is marked as outdated and the search continues up
-  the tree, until we get to the root.
-- In this case, 3 cannot handle updates for 7 itself, so the search continues
-  up to the entry module.
-- Module 0 _can_ handle the update and it will `require()` the new version of
-  module '3', which will also load the new version of module '7' in the process.
 
 ---
 
 # Updating Views
 
 ???
-- So given the ability to load a new version of some code for a UI
-  component, in order to hot-reload it, we need to update all of the DOM
-  elements in the app to reflect the new version.
-- React makes this easy
+- In order to load a new version of a UI component into a web app,
+  we need to remove, update or replace all of the DOM elements in
+  the app that were created by the changed component.
+
 ---
 
 class:middle
 
-React components are functions that return an object _describing_ what
-should be in the DOM.
-
-```js
-function Button(props) {
-  return <button onClick={props.onClick}>Click me</button>;
-}
+```hbs
+<button {{action "onClick"}}>{{label}}</button>
 ```
 
-is equivalent to...
+???
+- In Ember, a very simple Button component might look like this
+
+---
+class:middle
 
 ```js
 function Button(props) {
-  return {
-    type: 'button',
-    props: {
-      onClick: props.onClick,
-      children: 'Click me',
-    },
-    // a few other fields omitted
-  }
+  return <button onClick={props.onClick}>{props.label}</button>;
 }
 ```
 
 ???
-- In a traditional MVC framework, replacing a component is a tricky thing to do
-- You'd have to find all instances of a component on screen, remove their DOM
-  elements, generate new ones using the updated code and insert them back in place.
-- React components on the other hand are simply functions that return an
-  object describing what the DOM should look like and what event handlers should
-  be attached.
-- This makes hot reloading much easier
+- In React, it would look like this
+- A key thing to note, is that it is just a function. This function returns
+  an object describing what the DOM structure of a component looks like.
+- To load a new version of Button, we just need to make the code that calls this
+  function, call a new version instead.
+- The new version will then return a _different_ description of what DOM elements
+  and attributes should be present in the page for a button.
+- The React engine then takes care of transforming whatever is currently there
+  into a version that matches the new description.
 
 ---
 
 # Updating views
 
-App.js
+app.js:
 ```js
-module.exports = function () {
-  return <div>Hello World</div>;
-}
+var Button = require('./Button');
+ReactDOM.render(<Button label="Click Me"/>, document.getElementById('root'));
+
+*module.hot.accept('./Button', function () {
+  Button = require('./Button');
+  ReactDOM.render(<Button label="Click Me"/>, document.getElementById('root'));
+});
 ```
 
-index.js
-```js
-var App = require('./App');
-ReactDOM.render(<App />, document.getElementById('root'));
-
-*module.hot.accept('./App', function () {
-  App = require('./App');
-  ReactDOM.render(<App />, document.getElementById('root'));
-});
+Output:
+```html
+<div id="root">
+  <button>Click Me</button>
+</div>
 ```
 
 ???
 - This is the "hot reloading" Hello World with React
+- This works for simple components, but what if those
+  components have state?
 
 ---
 
-class:middle
+class: middle
 
-- If you are using Babel, the `react-transform-hmr` plugin can be used
-  to rewrite your code at compile time to add `module.hot` calls and reload
-  the component
-- Caveat: `react-transform-hmr` does not yet support stateless function
-  components.
+- How do we preserve the state of components?
+- What if we want to make changes to services as well as views?
 
 ???
-- The reason why 'react-transform-hmr' does not support function components
-  is interesting.
 
 ---
 
 class: middle
 
-- So that deals with updating the views, but how do we preserve
-  the state of the application?
-- What if we want to make changes to models as well as views?
-- This is where Redux comes in
+## Redux
+
+- Small library for managing state in JavaScript applications
+- Increasingly the standard solution in the React ecosystem
+
+???
+- The standard solution to this problem in the React ecosystem
+  is the Redux library
+- Redux is a small framework-independent library for managing
+  how app state is stored and modified
+- It is based on 3 ideas which combined together support hot reloading
 
 ---
 
 class: middle
 
+- As much a design pattern as a library
 - Inspired by _Elm_, a functional compile-to-JavaScript language.
 - Components in Elm are stateless, just a collection of 3 functions
 
 ???
-- Redux started as a project to enable hot reloading in
-  a robust way.
+- It is as much a design pattern as a library
 
 ---
 
@@ -472,6 +326,7 @@ class: middle
   initial state for the component, one that takes the state and
   returns a description of the UI to render given that state and finally 
   one to get the new state given the current state and an action.
+- A template is equivalent to a view function
 - An 'action' is something like a mouse click, or a WebSocket message
 - Important to notice for hot reloading: Component is entirely pure. Contains
   the logic to manage the state but doesn't store it. Therefore, to do
@@ -674,20 +529,54 @@ if (module.hot) {
 
 ---
 
-1. Use Redux directly or via ember-redux
+class: middle center
+
+![Ember Redux](images/ember-redux-site.png)
+ember-redux.com
 
 ???
-- Redux is a very small library and not tied to any
-  particular view framework.
+- ember-redux is a small library which integrates Redux with Ember
+- Provides convenience functions for creating a Redux store and hooking
+  it up to an Ember component
+
+---
+
+```js
+import Ember from 'ember';
+import hbs from 'htmlbars-inline-precompile';
+import connect from 'ember-redux/components/connect';
+
+var stateToComputed = (state) => {
+  return {
+    number: state.number
+  };
+};
+
+var dispatchToActions = (dispatch) => {
+  return {
+    add: () => dispatch({type: 'ADD'})
+  };
+};
+
+var NumbersComponent = Ember.Component.extend({
+    layout: hbs`
+      {{number}}
+      <button onclick={{action "add"}}>add</button>
+    `
+});
+
+export default connect(stateToComputed, dispatchToActions)(NumbersComponent);
+
+```
+(Code from ember-redux.com Quick Start example)
 
 ---
 
 # Summary
 
-- Hot reloading is a useful productivity tool, but really just one of
-  many productivity/debugging tools enabled by the architecture
-- Robust hot reloading is not just a build system feature, needs
-  an app architecture that separates state and logic
+- Hot reloading is great for productivity
+- Needs the right app architecture to be robust
+- Redux is one solution. Can be integrated with Ember.
 
 ---
 
